@@ -45,8 +45,6 @@
 #include <linux/pm_qos.h>
 #include <linux/cpufreq.h>
 
-#include <linux/regulator/consumer.h>
-
 #include "gf_spi.h"
 
 #if defined(USE_SPI_BUS)
@@ -59,14 +57,12 @@
 #define GF_SPIDEV_NAME     "goodix,fingerprint"
 /*device name after register in charater*/
 #define GF_DEV_NAME            "goodix_fp"
-//#define	GF_INPUT_NAME	    "qwerty"	/*"goodix_fp" */
-#define	GF_INPUT_NAME	    "gf318m"
+#define	GF_INPUT_NAME	    "goodix_fp"	/*"goodix_fp" */
 
 #define	CHRD_DRIVER_NAME	"goodix_fp_spi"
 #define	CLASS_NAME		    "goodix_fp"
-#define SPIDEV_MAJOR		225	/* assigned */
+#define SPIDEV_MAJOR		154	/* assigned */
 #define N_SPI_MINORS		32	/* ... up to 256 */
-
 
 struct gf_key_map key_map[] =
 {
@@ -91,8 +87,8 @@ struct gf_key_map key_map[] =
 #define gf_dbg(fmt, args...) do { \
 					pr_warn("gf:" fmt, ##args);\
 		} while (0)
-#define FUNC_ENTRY()  pr_warn("gf:%s, entry\n", __func__)
-#define FUNC_EXIT()  pr_warn("gf:%s, exit\n", __func__)
+#define FUNC_ENTRY()  pr_warn("gf:%s --> %d, entry\n", __func__, __LINE__)
+#define FUNC_EXIT()  pr_warn("gf:%s --> %d, exit\n", __func__, __LINE__)
 #else
 #define gf_dbg(fmt, args...)
 #define FUNC_ENTRY()
@@ -300,12 +296,15 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case GF_IOC_DISABLE_IRQ:
+	FUNC_ENTRY();
 		    gf_disable_irq(gf_dev);
 		break;
 	case GF_IOC_ENABLE_IRQ:
+	FUNC_ENTRY();
 		    gf_enable_irq(gf_dev);
 		break;
 	case GF_IOC_SETSPEED:
+	FUNC_ENTRY();
 #ifdef AP_CONTROL_CLK
    		retval = __get_user(speed, (u32 __user *) arg);
     	if (retval == 0) {
@@ -322,14 +321,17 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 #endif
 		break;
 	case GF_IOC_RESET:
+	FUNC_ENTRY();
 		gf_hw_reset(gf_dev, 70);
 		break;
 	case GF_IOC_COOLBOOT:
+	FUNC_ENTRY();
 		gf_power_off(gf_dev);
 		mdelay(5);
 		gf_power_on(gf_dev);
 		break;
 	case GF_IOC_SENDKEY:
+	FUNC_ENTRY();
 		if (copy_from_user
 		    (&gf_key, (struct gf_key *)arg, sizeof(struct gf_key))) {
 			pr_warn("Failed to copy data from user space.\n");
@@ -337,8 +339,10 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
+		gf_dbg("gf_ioctl:report key %d value %d \n", gf_key.key, gf_key.value);
                 for(i = 0; i< ARRAY_SIZE(key_map); i++) {
                     if(key_map[i].val == gf_key.key){
+                        if (gf_key.key == KEY_HOME);
                         input_report_key(gf_dev->input, gf_key.key, gf_key.value);
                         input_sync(gf_dev->input);
                         break;
@@ -352,6 +356,7 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		break;
 	case GF_IOC_CLK_READY:
+	FUNC_ENTRY();
 #ifdef AP_CONTROL_CLK
         gfspi_ioctl_clk_enable(gf_dev);
 #else
@@ -359,6 +364,7 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 #endif
 		break;
 	case GF_IOC_CLK_UNREADY:
+	FUNC_ENTRY();
 #ifdef AP_CONTROL_CLK
         gfspi_ioctl_clk_disable(gf_dev);
 #else
@@ -366,9 +372,11 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 #endif
 		break;
 	case GF_IOC_PM_FBCABCK:
+	FUNC_ENTRY();
 		__put_user(gf_dev->fb_black, (u8 __user *) arg);
 		break;
     case GF_IOC_POWER_ON:
+	FUNC_ENTRY();
         if(gf_dev->device_available == 1)
             pr_info("Sensor has already powered-on.\n");
         else
@@ -376,6 +384,7 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         gf_dev->device_available = 1;
         break;
     case GF_IOC_POWER_OFF:
+	FUNC_ENTRY();
         if(gf_dev->device_available == 0)
             pr_info("Sensor has already powered-off.\n");
         else
@@ -383,6 +392,7 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         gf_dev->device_available = 0;
         break;
 	default:
+	FUNC_ENTRY();
 		gf_dbg("Unsupport cmd:0x%x\n", cmd);
 		break;
 	}
@@ -406,7 +416,7 @@ static irqreturn_t gf_irq(int irq, void *handle)
 	if (gf_dev->async)
 		kill_fasync(&gf_dev->async, SIGIO, POLL_IN);
 #endif
-	printk("goodix goodix goodix  ---------\n");
+
 	return IRQ_HANDLED;
 }
 
@@ -567,8 +577,6 @@ static void gf_reg_key_kernel(struct gf_dev *gf_dev)
     }
 
     gf_dev->input->name = GF_INPUT_NAME;
-
-    printk("register_key888888");
     if (input_register_device(gf_dev->input))
         pr_warn("Failed to register GF as input device.\n");
 }
@@ -584,11 +592,8 @@ static int gf_probe(struct platform_device *pdev)
 	int status = -EINVAL;
 	unsigned long minor;
 	int ret;
-
-	struct regulator *vreg;
-
 	FUNC_ENTRY();
-	printk("goodix : gf_probe ***1*****\n");
+
 	/* Initialize the driver data */
 	INIT_LIST_HEAD(&gf_dev->device_entry);
 #if defined(USE_SPI_BUS)
@@ -598,13 +603,12 @@ static int gf_probe(struct platform_device *pdev)
 #endif
 	gf_dev->irq_gpio = -EINVAL;
 	gf_dev->reset_gpio = -EINVAL;
-//	gf_dev->pwr_gpio = -EINVAL;
+	gf_dev->pwr_gpio = -EINVAL;
 	gf_dev->device_available = 0;
 	gf_dev->fb_black = 0;
 
 	if (gf_parse_dts(gf_dev))
 		goto error;
-	printk("goodix : gf_probe ***33*****\n");
 /*
 	if (gf_power_on(gf_dev))
 		goto error;
@@ -613,38 +617,8 @@ static int gf_probe(struct platform_device *pdev)
 	/* If we can allocate a minor number, hook up this device.
 	 * Reusing minors is fine so long as udev or mdev is working.
 	 */
-
-#if 1
-	vreg = regulator_get(&pdev->dev,"vdd_ana");
-	if (!vreg) {
-//		dev_err(&gf_dev->spi->dev, "Unable to get vdd_ana\n");
-		printk("goodix :Unable to get vdd_ana\n");
-		goto error;
-	}
-        printk("goodix : probe get vdd-ana\n");
-	if (regulator_count_voltages(vreg) > 0) {
-		ret = regulator_set_voltage(vreg, 2950000,2950000);
-		if (ret){
-//			dev_err(&gf_dev->spi->dev,"Unable to set voltage on vdd_ana");
-			printk("goodix :Unable to set voltage on vdd_ana\n");
-			goto error;
-		}
-	}
-	ret = regulator_enable(vreg);
-	if (ret) {
-//		dev_err(&gf_dev->spi->dev, "error enabling vdd_ana %d\n",ret);
-		printk("error enabling vdd_ana \n");
-		regulator_put(vreg);
-		vreg = NULL;
-		goto error;
-	}
-	printk("goodix :Set voltage on vdd_ana for goodix fingerprint\n");
-//	dev_info(&&gf_dev->spi->dev,"Set voltage on vdd_ana for goodix fingerprint");
-#endif
-
 	mutex_lock(&device_list_lock);
 	minor = find_first_zero_bit(minors, N_SPI_MINORS);
-	printk("goodix : gf_probe ***2*****\n");
 	if (minor < N_SPI_MINORS) {
 		struct device *dev;
 
@@ -688,9 +662,8 @@ static int gf_probe(struct platform_device *pdev)
 		gf_dev->notifier = goodix_noti_block;
 		fb_register_client(&gf_dev->notifier);
 		gf_reg_key_kernel(gf_dev);
-		printk("goodix : gf_probe ***3*****\n");	
+		
         gf_dev->irq = gf_irq_num(gf_dev);
-		printk("goodix : gf_probe ***3*gf_irq_num = %d****\n",gf_dev->irq);
 #if 1
 		ret = request_threaded_irq(gf_dev->irq, NULL, gf_irq,
 					   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
@@ -705,7 +678,7 @@ static int gf_probe(struct platform_device *pdev)
 			gf_disable_irq(gf_dev);
 		}
 	}
-	printk("goodix : gf_probe ***4*****\n");
+
 	return status;
 
 error:
@@ -854,11 +827,14 @@ static int __init gf_init(void)
 		return PTR_ERR(gf_class);
 	}
 #if defined(USE_PLATFORM_BUS)
+	FUNC_ENTRY();
 	status = platform_driver_register(&gf_driver);
 #elif defined(USE_SPI_BUS)
+	FUNC_ENTRY();
 	status = spi_register_driver(&gf_driver);
 #endif
 	if (status < 0) {
+	FUNC_ENTRY();
 		class_destroy(gf_class);
 		unregister_chrdev(SPIDEV_MAJOR, gf_driver.driver.name);
 		pr_warn("Failed to register SPI driver.\n");
