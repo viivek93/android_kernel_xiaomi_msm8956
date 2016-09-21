@@ -863,10 +863,10 @@ config SENSORS_MC3430
 	 Say Y here if you want to enable the MC3430 acceleration sensor
 	 driver.
 
-config SENSORS_OCH175
-	tristate "OCH175 HALL Switch"
-	help
-	 If you say yes here, you get support for hall switch control device
+config HALL
+	tristate "HALL Switch"
+ 	help
+ 	 If you say yes here, you get support for hall switch control device
 
 config SENSORS_ISL29044A
 	tristate "INTERSIL P/L sensor"
